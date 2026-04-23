@@ -277,6 +277,9 @@ uint8_t mc_probe_cycle(float *target, plan_line_data_t *pl_data, uint8_t parser_
     return(GC_PROBE_FAIL_INIT); // Nothing else to do but bail.
   }
 
+  // Disable hard limits during probe cycle to prevent shared pin from triggering ALARM
+  limits_disable();
+
   // Setup and queue probing motion. Auto cycle-start should not start the cycle.
   mc_line(target, pl_data);
 
@@ -287,10 +290,14 @@ uint8_t mc_probe_cycle(float *target, plan_line_data_t *pl_data, uint8_t parser_
   system_set_exec_state_flag(EXEC_CYCLE_START);
   do {
     protocol_execute_realtime();
-    if (sys.abort) { return(GC_PROBE_ABORT); } // Check for system abort
+    if (sys.abort) { 
+      limits_init(); // Re-enable if aborted
+      return(GC_PROBE_ABORT); 
+    } 
   } while (sys.state != STATE_IDLE);
 
   // Probing cycle complete!
+  limits_init(); // Re-enable hard limits
 
   // Set state variables and error out, if the probe failed and cycle with error is enabled.
   if (sys_probe_state == PROBE_ACTIVE) {
